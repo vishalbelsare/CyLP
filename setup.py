@@ -3,23 +3,10 @@ import sys
 import platform
 from os.path import join, abspath, dirname
 import numpy
-import unicodedata
 from subprocess import check_output
-
-#A unicode function that is compatible with Python 2 and 3
-u = lambda s: s if sys.version_info[0] > 2 else unicode(s, 'utf-8')
-myopen = lambda s: open(s) if sys.version_info[0] == 2 else open(s, encoding="utf-8") 
 
 from setuptools import setup
 from setuptools import Extension
-from setuptools.command.install import install
-
-def getBdistFriendlyString(s):
-    '''
-    Solve the issue with restructuredText README
-    "ordinal not in range error" when using bdist_mpkg or bdist_wininst
-    '''
-    return unicodedata.normalize('NFKD', u(s))
 
 VERSION = open(join('cylp', 'VERSION')).read().strip()
 
@@ -38,23 +25,34 @@ elif 'win' in operatingSystem:
 
 CoinDir = None
 
+libs = []
+libDirs = []
+incDirs = []
+
 try:
-    CoinDir = os.environ['COIN_INSTALL_DIR']
+    if len(sys.argv) > 1 and (sys.argv[1] == "sdist" or sys.argv[1] == "egg_info"):
+        # Do not need CoinDir
+        pass
+    else:
+        CoinDir = os.environ['COIN_INSTALL_DIR']
 except:
     # If user didn't supply location, then try pkg-config
     try:
-        flags = (check_output(['pkg-config', '--libs', 'cbc'])
-                 .strip().decode('utf-8'))
-        libs = [flag[2:] for flag in flags.split()
-                if flag.startswith('-l')]
-        libDirs = [flag[2:] for flag in flags.split()
-                   if flag.startswith('-L')]
-        flags = (check_output(['pkg-config', '--cflags', 'cbc'])
-                 .strip().decode('utf-8'))
-        incDirs = [flag[2:] for flag in flags.split() if
-                   flag.startswith('-I')]
+        for p in ['cbc','cgl','osi-clp','clp','osi','coinutils']:
+            flags = (check_output(['pkg-config', '--libs', p])
+                     .strip().decode('utf-8'))
+            for flag in flags.split():
+                if flag.startswith('-l') and flag[2:] not in libs:
+                    libs.append(flag[2:]) 
+                if flag.startswith('-L') and flag[2:] not in libDirs:
+                    libDirs.append(flag[2:]) 
+            flags = (check_output(['pkg-config', '--cflags', p])
+                     .strip().decode('utf-8'))
+            for flag in flags.split():
+                if flag.startswith('-I') and flag[2:] not in incDirs:
+                    incDirs.append(flag[2:]) 
     except:
-        # If pkg-config fails, then look for an installed Cbc 
+        # If pkg-config fails, then look for an installed Cbc
         try:
             location = dirname(
                 check_output(['which', 'cbc']).strip()).decode('utf-8')
@@ -69,7 +67,7 @@ except:
             * The cbc executable is in your executable path and is installed
             at the same location as the libraries. 
             ''')
-        
+
 if CoinDir != None:
     # We come here if user supplied the installation directory or pkg-config failed
     if operatingSystem == 'windows':
@@ -392,9 +390,12 @@ ext_modules += [Extension('cylp.cy.CyCutGeneratorPythonBase',
                           extra_compile_args=extra_compile_args,
                           extra_link_args=extra_link_args), ]
 
+# Add language level directive per https://stackoverflow.com/a/58116368
+for e in ext_modules:
+    e.cython_directives = {'language_level': "3"} #all are Python-3
 
-s_README = getBdistFriendlyString(myopen('README.rst').read())
-s_AUTHORS = u(open('AUTHORS').read())
+s_README = open('README.rst').read()
+s_AUTHORS = open('AUTHORS').read()
 
 extra_files = ['cpp/*.hpp', 'cpp/*.h', 'cy/*.pxd', 'VERSION']
 
@@ -413,6 +414,6 @@ setup(name='cylp',
                 'cylp.py.utils', 'cylp.py.mip','cylp.py.QP'],
       cmdclass={'build_ext': build_ext},
       ext_modules=ext_modules,
-      install_requires=['numpy >= 1.5.0', 'scipy >= 0.10.0'],
+      install_requires=['numpy >= 1.5.0,<2.0.0', 'scipy >= 0.10.0', 'hypothesis'],
       zip_safe = False,
       package_data={"cylp": extra_files})

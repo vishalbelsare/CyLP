@@ -1,12 +1,7 @@
 #include "ICoinIndexedVector.hpp"
 
-// define PyInt_* macros for Python 3.x
-#ifndef PyInt_Check
-#define PyInt_Check             PyLong_Check
-#define PyInt_FromLong          PyLong_FromLong
-#define PyInt_AsLong            PyLong_AsLong
-#define PyInt_Type              PyLong_Type
-#endif
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/ndarraytypes.h>
 
 ICoinIndexedVector::ICoinIndexedVector(){
     _import_array();
@@ -17,7 +12,7 @@ PyObject* ICoinIndexedVector::getIndicesNPArray(){
 
     npy_intp dims = this->getNumElements();
     PyObject *Arr = PyArray_SimpleNewFromData(1, &dims, 
-            PyArray_INT32, 
+            NPY_INT32, 
             this->getIndices());
     return Arr;
 }
@@ -26,7 +21,7 @@ PyObject* ICoinIndexedVector::getDenseVectorNPArray(){
 
     npy_intp dims = this->capacity();
     PyObject *Arr = PyArray_SimpleNewFromData(1, &dims, 
-            PyArray_DOUBLE, 
+            NPY_DOUBLE, 
             this->denseVector());
     return Arr;
 }
@@ -68,8 +63,8 @@ void ICoinIndexedVector::assign(PyObject* ind, PyObject* other){
 
     //_import_array();
 
-    if( PyInt_Check(other) ) {
-        val = (double)PyInt_AsLong(other);
+    if( PyLong_Check(other) ) {
+        val = PyLong_AsDouble(other);
         other_is_num = 1;
     } else if( PyFloat_Check(other) ) {
         val = PyFloat_AsDouble(other);
@@ -84,8 +79,8 @@ void ICoinIndexedVector::assign(PyObject* ind, PyObject* other){
     }
 
 
-    if( PyInt_Check(ind) ) {
-        idx = (double)PyInt_AsLong(ind);
+    if( PyLong_Check(ind) ) {
+        idx = PyLong_AsDouble(ind);
         ind_is_num = 1;
     } else if( PyFloat_Check(ind) ) {
         idx = PyFloat_AsDouble(ind);

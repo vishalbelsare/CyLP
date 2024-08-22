@@ -119,15 +119,7 @@
 
 '''
 
-from __future__ import print_function
 from functools import reduce
-
-# Python 3 does not have long, only int
-try:
-    long
-except NameError:
-    long = int
-
 from itertools import product
 from copy import deepcopy
 from operator import mul
@@ -136,7 +128,7 @@ from scipy import sparse
 from scipy.sparse import identity, lil_matrix
 from cylp.py.utils.util import Ind, getMultiDimMatrixIndex, getTupleIndex
 
-NUMBERS = (int, float, long, np.int64, np.int32, np.double)
+NUMBERS = (int, float, np.int64, np.int32, np.double)
 def isNumber(n):
     return (isinstance(n, NUMBERS) or
             (isinstance(n, CyLPArray) and n.shape == ()))
@@ -170,6 +162,8 @@ def identitySub(var):
     return I(n)[var.indices, :]
 
 class CyLPExpr:
+    __array_ufunc__ = None
+    
     operators = ('>=', '<=', '==', '+', '-', '*', 'u-', 'sum')
 
     def __init__(self, opr='', left='', right=''):
@@ -209,17 +203,33 @@ class CyLPExpr:
         return v
 
     def __rmul__(self, other):
+        if type(other)==np.ndarray:
+            raise ValueError("You should use @ when multiplying a variable with a numpy array")
         v = CyLPExpr(opr="*", left=other, right=self)
         v.expr = v
         self.expr = v
         return v
 
     def __mul__(self, other):
+        if type(other)==np.ndarray:
+            raise ValueError("You should use @ when multiplying a variable with a numpy array")
         v = CyLPExpr(opr="*", left=self, right=other)
         v.expr = v
         self.expr = v
         return v
 
+    def __rmatmul__(self, other):
+        v = CyLPExpr(opr="*", left=other, right=self)
+        v.expr = v
+        self.expr = v
+        return v
+
+    def __matmul__(self, other):
+        v = CyLPExpr(opr="*", left=self, right=other)
+        v.expr = v
+        self.expr = v
+        return v
+    
     def __rsub__(self, other):
         v = CyLPExpr(opr="-", left=other, right=self)
         v.expr = v
@@ -506,7 +516,7 @@ class CyLPConstraint:
                 #dim = left.parentDim
             else:
 #                # FIXME: Think of the correct way to check bound dimensions
-#                if (not isinstance(right, (float, long, int)) and
+#                if (not isinstance(right, (float, int)) and
 #                            right.shape[0] != self.nRows):
 #                    #raise Exception('Bound dim: %d, expected dim: %d '
 #                    #                % (right.shape[0], self.nRows))
